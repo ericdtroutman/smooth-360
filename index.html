@@ -206,7 +206,7 @@ const grid=document.getElementById('grid'),empty=document.getElementById('empty'
 function ago(t){const m=Math.round((Date.now()-t)/60000);if(m<1)return'Just now';if(m<60)return m+' min ago';const h=Math.round(m/60);if(h<24)return h+' h ago';const d=Math.round(h/24);return d===1?'Yesterday':d+' days ago';}
 function render(){const list=(window.Smooth360?Smooth360.readRecent():[]).slice(0,4);
   grid.replaceChildren(...list.map(r=>{const b=document.createElement('button');b.className='card';b.type='button';
-    const img=document.createElement('img');img.className='thumb';img.alt='';img.loading='lazy';img.onerror=()=>{img.style.visibility='hidden';};img.src=r.thumb;
+    const img=document.createElement('img');img.className='thumb';img.alt='';img.onerror=()=>{img.style.visibility='hidden';};img.src=r.thumb;
     const cap=document.createElement('span');cap.className='cap';const n=document.createElement('b');n.textContent=r.name;const w=document.createElement('span');w.textContent=ago(r.t);cap.append(n,w);
     b.append(img,cap);b.setAttribute('aria-label','Spin '+r.name);b.onclick=()=>Smooth360.openRecord(r);return b;}));
   grid.hidden=!list.length;empty.hidden=!!list.length;clearBtn.hidden=!list.length;}
