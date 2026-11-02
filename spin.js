@@ -1,4 +1,26 @@
 (()=>{
+// Modes: 'bookmarklet' (opens at once on warhammer.com), 'userscript' (adds a launch button on
+// warhammer.com, and only syncs the recent list on the Smooth 360 page), 'app' (the Smooth 360 page itself).
+const ON_GW=/(^|\.)warhammer\.com$/.test(location.hostname);
+const MODE=window.__gwspinApp?'app':window.__gwspinUserscript?'userscript':'bookmarklet';
+
+// Recent models: the last 4 spins opened on warhammer.com. Userscript storage (GM.*) is shared
+// between warhammer.com and the Smooth 360 page; page localStorage is the fallback and the app's copy.
+const KEY='smooth360-recent',MAX=4;
+const hasGM=()=>typeof GM!=='undefined'&&GM&&GM.getValue&&GM.setValue;
+const readLS=()=>{try{return JSON.parse(localStorage.getItem(KEY)||'[]')||[];}catch(e){return[];}};
+const writeLS=l=>{try{localStorage.setItem(KEY,JSON.stringify(l));}catch(e){}};
+const merge=(...lists)=>{const m=new Map();lists.flat().filter(r=>r&&r.url&&r.folders&&r.folders.length).forEach(r=>{const o=m.get(r.url);if(!o||r.t>o.t)m.set(r.url,{...o,...r,grids:{...(o&&o.grids),...r.grids}});});return[...m.values()].sort((a,b)=>b.t-a.t).slice(0,MAX);};
+async function readGM(){if(!hasGM())return[];try{return JSON.parse(await GM.getValue(KEY,'[]'))||[];}catch(e){return[];}}
+async function saveRecent(rec){const l=merge([rec],await readGM(),readLS());writeLS(l);if(hasGM()){try{await GM.setValue(KEY,JSON.stringify(l));}catch(e){}}}
+
+if(MODE==='userscript'&&!ON_GW){
+  // On the Smooth 360 page: hand the recent list to the page, then stop.
+  const sync=async()=>{const l=merge(await readGM(),readLS());writeLS(l);if(hasGM()){try{await GM.setValue(KEY,JSON.stringify(l));}catch(e){}}
+    document.documentElement.setAttribute('data-smooth360','installed');document.dispatchEvent(new CustomEvent('smooth360-sync'));};
+  sync();document.addEventListener('visibilitychange',()=>{if(!document.hidden)sync();});
+  return;
+}
 if(window.__gwspin){window.__gwspin.open();return;}
 const RE=/\/app\/resources\/catalog\/product\/threeSixty\/([^\/?"'\s)\\]+)\//g;
 const p=n=>String(n).padStart(2,'0');
@@ -17,8 +39,9 @@ function findFolders(){
   performance.getEntriesByType('resource').forEach(e=>scan(e.name));
   return [...s];
 }
-const ROOT=location.origin+'/app/resources/catalog/product/threeSixty/';
-const head=u=>fetch(u,{method:'HEAD'}).then(r=>r.ok).catch(()=>false);
+const ROOT='https://www.warhammer.com/app/resources/catalog/product/threeSixty/';
+const head=ON_GW?u=>fetch(u,{method:'HEAD'}).then(r=>r.ok).catch(()=>false)
+  :u=>new Promise(r=>{const i=new Image();i.onload=()=>r(true);i.onerror=()=>r(false);i.src=u;});
 async function probe(base){
   const cols=await Promise.all(Array.from({length:72},(_,i)=>head(base+'01-'+p(i+1)+'.jpg?w=40')));
   let nc=0;while(nc<72&&cols[nc])nc++;
@@ -41,8 +64,8 @@ sh.innerHTML=`<style>
 .bot{padding-right:84px}
 .name{font-size:14px;font-weight:600;letter-spacing:.02em}
 .meta{font-size:12px;color:#a59d92;font-variant-numeric:tabular-nums}
-select,button{font:inherit;font-size:13px;color:#ece7df;background:#2a2723;border:1px solid #47423b;border-radius:6px;padding:6px 10px;cursor:pointer}
-button:hover,select:hover{border-color:#c9a45c}
+select,button,.btn{text-decoration:none;font:inherit;font-size:13px;color:#ece7df;background:#2a2723;border:1px solid #47423b;border-radius:6px;padding:6px 10px;cursor:pointer}
+button:hover,select:hover,.btn:hover{border-color:#c9a45c}
 button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid #c9a45c;outline-offset:2px}
 button.on{background:#c9a45c;color:#1b1814;border-color:#c9a45c}
 .stage{flex:1;position:relative;min-height:0;margin:0 16px;border-radius:8px;overflow:hidden;cursor:grab;touch-action:none}
@@ -61,7 +84,7 @@ input[type=range]{width:min(360px,50vw);accent-color:#c9a45c}
 <div class="wrap" role="dialog" aria-label="360 viewer">
  <div class="top">
   <div class="grp"><span class="name">360° Viewer</span><select id="spinSel" hidden></select><span class="meta" id="meta">Finding spin…</span></div>
-  <button id="close" title="Close (Esc)">Close ✕</button>
+  <div class="grp"><a id="prod" class="btn" href="#" target="_blank" rel="noopener" hidden>Product page ↗</a><button id="close" title="Close (Esc)">Close ✕</button></div>
  </div>
  <div class="stage" id="stage"><canvas id="cv"></canvas><div class="msg" id="msg">Loading…</div><div class="bar" id="bar"></div></div>
  <div class="bot">
@@ -75,7 +98,7 @@ input[type=range]{width:min(360px,50vw);accent-color:#c9a45c}
 </div>`;
 const $=id=>sh.getElementById(id);
 const cv=$('cv'),ctx=cv.getContext('2d'),stage=$('stage'),msg=$('msg'),bar=$('bar');
-const S={folders:[],base:'',nr:0,nc:0,imgs:[],a:0,row:0,z:1,px:0,py:0,vel:0,auto:false,blend:true,bg:'#fff',dpr:1,raf:0,last:0,dragging:false,token:0};
+const S={folders:[],base:'',nr:0,nc:0,imgs:[],a:0,row:0,z:1,px:0,py:0,vel:0,auto:false,blend:true,bg:'#fff',dpr:1,raf:0,last:0,dragging:false,token:0,grids:{}};
 const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 function resize(){const r=stage.getBoundingClientRect();S.dpr=devicePixelRatio||1;cv.width=Math.round(r.width*S.dpr);cv.height=Math.round(r.height*S.dpr);draw();}
@@ -104,10 +127,15 @@ function resetView(){S.z=1;S.px=0;S.py=0;draw();}
 
 async function load(folder){
   const tok=++S.token;S.base=ROOT+encodeURIComponent(folder)+'/';S.nc=0;S.imgs=[];msg.hidden=false;msg.textContent='Measuring spin…';bar.style.width='0';
-  const g=await probe(S.base);if(tok!==S.token)return;
-  if(!g.nc){msg.textContent='Could not load this spin. Try reloading the product page.';return;}
+  const known=S.grids&&S.grids[folder];
+  const g=known&&known.nc?known:await probe(S.base);if(tok!==S.token)return;
+  if(!g.nc){msg.textContent=ON_GW?'Could not load this spin. Try reloading the product page.':'Could not load this spin. Games Workshop may have removed it.';return;}
+  S.grids={...S.grids,[folder]:{nr:g.nr,nc:g.nc}};
+  if(ON_GW){const h1=document.querySelector('h1');
+    saveRecent({url:location.origin+location.pathname,name:((h1&&h1.textContent)||document.title||'Model').trim().replace(/\s+/g,' ').slice(0,120),
+      folders:S.folders,grids:{[folder]:{nr:g.nr,nc:g.nc}},thumb:ROOT+encodeURIComponent(S.folders[0])+'/01-01.jpg?fm=webp&w=400',t:Date.now()});}
   S.nr=g.nr;S.nc=g.nc;S.a=0;S.row=0;S.vel=0;resetView();
-  $('meta').textContent=`${g.nc} angles × ${g.nr} heights · ${Math.round(360/g.nc)}° per photo`;
+  $('meta').textContent=MODE==='app'&&S.name?S.name:`${g.nc} angles × ${g.nr} heights · ${Math.round(360/g.nc)}° per photo`;
   $('rows').innerHTML='';for(let r=0;r<g.nr;r++){const b=document.createElement('button');b.textContent=r+1;b.title='Camera height '+(r+1);b.onclick=()=>setRow(r);$('rows').appendChild(b);}
   setRow(0);
   const w=Math.min(1600,Math.round(Math.max(innerWidth,innerHeight)*(devicePixelRatio||1)/100)*100);
@@ -166,6 +194,12 @@ function open(){vis(host,true);prevOverflow=document.documentElement.style.overf
 host.id='gwspin-host';
 document.body.appendChild(host);
 window.__gwspin={open};
+// App mode: open a saved recent model without visiting warhammer.com.
+function openRecord(rec){vis(host,true);prevOverflow=document.documentElement.style.overflow;document.documentElement.style.overflow='hidden';resize();
+  const sel=$('spinSel'),prod=$('prod');prod.href=rec.url;prod.hidden=false;
+  S.folders=rec.folders.slice();S.grids={...rec.grids};S.bg='#fff';msg.style.color='';
+  sel.innerHTML=S.folders.map((x,i)=>`<option value="${x.replace(/"/g,'&quot;')}">Spin ${i+1}</option>`).join('');sel.hidden=S.folders.length<2;
+  S.name=rec.name||'';$('meta').textContent=S.name;load(S.folders[0]);}
 
 if(window.__gwspinUserscript){
   // Userscript mode: stay closed and put a launch button on product pages that have a spin.
@@ -180,6 +214,8 @@ if(window.__gwspinUserscript){
   let lastUrl='';
   setInterval(()=>{vis(bh,has()&&!isOpen());
     if(location.href!==lastUrl){lastUrl=location.href;if(isOpen())close();}},1200);
+}else if(MODE==='app'){
+  vis(host,false);window.Smooth360={openRecord,readRecent:readLS,clearRecent:()=>writeLS([])};
 }else{
   open();
 }

@@ -10,7 +10,7 @@ import urllib.parse
 from pathlib import Path
 
 ROOT = Path(__file__).parent
-VERSION = "1.0.1"
+VERSION = "1.1.0"
 PAGES = "https://ericdtroutman.github.io/smooth-360"
 
 code = (ROOT / "spin.js").read_text()
@@ -21,7 +21,9 @@ header = f"""// ==UserScript==
 // @version      {VERSION}
 // @description  Adds a smooth, zoomable 360° viewer button to warhammer.com product pages.
 // @match        https://www.warhammer.com/*
-// @grant        none
+// @match        https://ericdtroutman.github.io/smooth-360/*
+// @grant        GM.getValue
+// @grant        GM.setValue
 // @run-at       document-idle
 // @inject-into  auto
 // @homepageURL  {PAGES}/

@@ -6,6 +6,7 @@ A smoother 360° viewer for warhammer.com product pages. It adds a **Smooth 360*
 - cross-fading between Games Workshop's photos, which are taken 30° apart
 - camera height on vertical drag (4 heights, up to straight overhead)
 - pinch, scroll-wheel and keyboard controls
+- a **Recent models** list on the install page with the last 4 spins you opened, so you can view them again without going back to warhammer.com. The userscript keeps this list in sync.
 
 **Install page:** https://ericdtroutman.github.io/smooth-360/
 
