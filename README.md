@@ -3,7 +3,7 @@
 A smoother 360° viewer for warhammer.com product pages. It adds a **Smooth 360** button to any product that has a spin. Tapping it opens a full-screen viewer with:
 
 - the same turn for every pixel you drag, plus momentum when you flick
-- cross-fading between Games Workshop's photos, which are taken 30° apart
+- an optional **Sharpen** filter for fine detail once the model stops moving
 - camera height on vertical drag (4 heights, up to straight overhead)
 - pinch, scroll-wheel and keyboard controls
 - a **Recent models** list on the install page with the last 4 spins you opened, so you can view them again without going back to warhammer.com. The userscript keeps this list in sync.

@@ -71,6 +71,7 @@ button.on{background:#c9a45c;color:#1b1814;border-color:#c9a45c}
 .stage{flex:1;position:relative;min-height:0;margin:0 16px;border-radius:8px;overflow:hidden;cursor:grab;touch-action:none}
 .stage.drag{cursor:grabbing}
 canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+.stage.sharp:not(.moving) canvas{filter:url(#gwspin-sharp)}
 .msg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:24px;font-size:14px;color:#3a352f;pointer-events:none}
 [hidden]{display:none!important}
 .bar{position:absolute;left:0;bottom:0;height:3px;background:#c9a45c;transition:width .2s}
@@ -86,19 +87,19 @@ input[type=range]{width:min(360px,50vw);accent-color:#c9a45c}
   <div class="grp"><span class="name">360° Viewer</span><select id="spinSel" hidden></select><span class="meta" id="meta">Finding spin…</span></div>
   <div class="grp"><a id="prod" class="btn" href="#" target="_blank" rel="noopener" hidden>Product page ↗</a><button id="close" title="Close (Esc)">Close ✕</button></div>
  </div>
- <div class="stage" id="stage"><canvas id="cv"></canvas><div class="msg" id="msg">Loading…</div><div class="bar" id="bar"></div></div>
+ <div class="stage" id="stage"><svg width="0" height="0" style="position:absolute" aria-hidden="true"><filter id="gwspin-sharp" color-interpolation-filters="sRGB"><feConvolveMatrix order="3" kernelMatrix="0 -0.75 0 -0.75 4 -0.75 0 -0.75 0" preserveAlpha="true" edgeMode="duplicate"/></filter></svg><canvas id="cv"></canvas><div class="msg" id="msg">Loading…</div><div class="bar" id="bar"></div></div>
  <div class="bot">
   <div class="grp"><span class="lbl">Angle</span><input type="range" id="ang" min="0" max="360" step="0.5" value="0"></div>
   <div class="grp"><span class="lbl">Camera low → top</span><span id="rows" class="grp"></span></div>
   <button id="auto">Auto-spin</button>
-  <button id="blend" class="on" title="Cross-fade between photos for smoother turning">Smooth</button>
+  <button id="sharpBtn" title="Sharpen fine detail when the model is still">Sharpen</button>
   <button id="reset">Reset view</button>
   <span class="hint">Drag to turn · drag down to look from above · scroll to zoom · Shift+drag to pan · ← → ↑ ↓ · Space</span>
  </div>
 </div>`;
 const $=id=>sh.getElementById(id);
 const cv=$('cv'),ctx=cv.getContext('2d'),stage=$('stage'),msg=$('msg'),bar=$('bar');
-const S={folders:[],base:'',nr:0,nc:0,imgs:[],a:0,row:0,z:1,px:0,py:0,vel:0,auto:false,blend:true,bg:'#fff',dpr:1,raf:0,last:0,dragging:false,token:0,grids:{}};
+const S={folders:[],base:'',nr:0,nc:0,imgs:[],a:0,row:0,z:1,px:0,py:0,vel:0,auto:false,bg:'#fff',dpr:1,raf:0,last:0,dragging:false,token:0,grids:{}};
 const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 function resize(){const r=stage.getBoundingClientRect();S.dpr=devicePixelRatio||1;cv.width=Math.round(r.width*S.dpr);cv.height=Math.round(r.height*S.dpr);draw();}
@@ -107,20 +108,21 @@ function getImg(r,c){const row=S.imgs[r];if(!row)return null;const im=row[c];if(
 function draw(){
   const W=cv.width,H=cv.height;ctx.fillStyle=S.bg;ctx.fillRect(0,0,W,H);
   if(!S.nc)return;
-  const nc=S.nc,a=((S.a%nc)+nc)%nc,i0=Math.floor(a),t=a-i0,i1=(i0+1)%nc;
-  const A=getImg(S.row,S.blend?i0:Math.round(a)%nc);if(!A)return;
+  const nc=S.nc,a=((S.a%nc)+nc)%nc;
+  const A=getImg(S.row,Math.round(a)%nc);if(!A)return;
   const s=Math.min(W/A.naturalWidth,H/A.naturalHeight)*S.z,w=A.naturalWidth*s,h=A.naturalHeight*s;
   const x=(W-w)/2+S.px*S.dpr,y=(H-h)/2+S.py*S.dpr;
   ctx.imageSmoothingQuality='high';ctx.globalAlpha=1;ctx.drawImage(A,x,y,w,h);
-  if(S.blend&&t>0.002){const B=getImg(S.row,i1);if(B&&B!==A){ctx.globalAlpha=t;ctx.drawImage(B,x,y,w,h);ctx.globalAlpha=1;}}
   const deg=a/nc*360;$('ang').value=deg.toFixed(1);
 }
 function loop(ts){
   const dt=Math.min(50,ts-(S.last||ts));S.last=ts;let go=false;
   if(S.auto&&!S.dragging){S.a+=dt*S.nc/9000;go=true;}
   else if(!S.dragging&&Math.abs(S.vel)>0.00005){S.a+=S.vel*dt;S.vel*=Math.pow(0.94,dt/16);go=true;}
-  draw();S.raf=go?requestAnimationFrame(loop):0;if(!go)S.last=0;
+  draw();S.raf=go?requestAnimationFrame(loop):0;if(!go){S.last=0;if(!S.dragging)moving(false);}else moving(true);
 }
+let settleT=0;
+function moving(v){clearTimeout(settleT);if(v)stage.classList.add('moving');else settleT=setTimeout(()=>{if(!S.dragging&&!S.raf)stage.classList.remove('moving');},150);}
 function kick(){if(!S.raf){S.last=0;S.raf=requestAnimationFrame(loop);}}
 function setRow(r){S.row=Math.max(0,Math.min(S.nr-1,r));[...$('rows').children].forEach((b,i)=>b.classList.toggle('on',i===S.row));draw();}
 function resetView(){S.z=1;S.px=0;S.py=0;draw();}
@@ -154,7 +156,7 @@ const pts=new Map();let lastX=0,lastY=0,lastT=0,accY=0,pinch0=0,z0=1,panMode=fal
 stage.addEventListener('pointerdown',e=>{stage.setPointerCapture(e.pointerId);pts.set(e.pointerId,{x:e.clientX,y:e.clientY});
   if(pts.size===2){const[a,b]=[...pts.values()];pinch0=Math.hypot(a.x-b.x,a.y-b.y);z0=S.z;return;}
   S.dragging=true;S.auto=false;$('auto').classList.remove('on');S.vel=0;panMode=e.shiftKey||e.button!==0;
-  lastX=e.clientX;lastY=e.clientY;lastT=performance.now();accY=0;stage.classList.add('drag');});
+  lastX=e.clientX;lastY=e.clientY;lastT=performance.now();accY=0;stage.classList.add('drag');moving(true);});
 stage.addEventListener('pointermove',e=>{if(!pts.has(e.pointerId))return;pts.set(e.pointerId,{x:e.clientX,y:e.clientY});
   if(pts.size===2){const[a,b]=[...pts.values()];const d=Math.hypot(a.x-b.x,a.y-b.y);if(pinch0){S.z=Math.max(1,Math.min(6,z0*d/pinch0));draw();}return;}
   if(!S.dragging)return;const dx=e.clientX-lastX,dy=e.clientY-lastY,now=performance.now(),dt=Math.max(1,now-lastT);
@@ -166,12 +168,18 @@ const up=e=>{pts.delete(e.pointerId);if(pts.size)return;pinch0=0;if(!S.dragging)
   if(performance.now()-lastT>80||reduce||panMode)S.vel=0;kick();};
 stage.addEventListener('pointerup',up);stage.addEventListener('pointercancel',up);
 stage.addEventListener('contextmenu',e=>e.preventDefault());
-stage.addEventListener('wheel',e=>{e.preventDefault();const r=stage.getBoundingClientRect();const cx=e.clientX-r.left-r.width/2,cy=e.clientY-r.top-r.height/2;
+stage.addEventListener('wheel',e=>{e.preventDefault();moving(true);moving(false);const r=stage.getBoundingClientRect();const cx=e.clientX-r.left-r.width/2,cy=e.clientY-r.top-r.height/2;
   const nz=Math.max(1,Math.min(6,S.z*Math.exp(-e.deltaY*0.0015)));S.px=cx-(cx-S.px)*(nz/S.z);S.py=cy-(cy-S.py)*(nz/S.z);S.z=nz;if(S.z===1){S.px=0;S.py=0;}draw();},{passive:false});
 stage.addEventListener('dblclick',resetView);
-$('ang').addEventListener('input',e=>{S.vel=0;S.auto=false;$('auto').classList.remove('on');S.a=e.target.value/360*S.nc;draw();});
+$('ang').addEventListener('input',e=>{moving(true);moving(false);S.vel=0;S.auto=false;$('auto').classList.remove('on');S.a=e.target.value/360*S.nc;draw();});
 $('auto').onclick=()=>{S.auto=!S.auto;$('auto').classList.toggle('on',S.auto);kick();};
-$('blend').onclick=()=>{S.blend=!S.blend;$('blend').classList.toggle('on',S.blend);draw();};
+// Sharpen: an SVG convolution filter on the canvas. It is switched off while the model is moving
+// (cheaper, and motion hides the difference) and comes back once it settles. Preference is remembered.
+let sharpOn=true;try{sharpOn=localStorage.getItem('smooth360-sharpen')!=='off';}catch(e){}
+const applySharp=()=>{stage.classList.toggle('sharp',sharpOn);$('sharpBtn').classList.toggle('on',sharpOn);$('sharpBtn').setAttribute('aria-pressed',sharpOn);};
+$('sharpBtn').onclick=()=>{sharpOn=!sharpOn;try{localStorage.setItem('smooth360-sharpen',sharpOn?'on':'off');}catch(e){}applySharp();};
+applySharp();
+if(!document.getElementById('gwspin-sharp')){const d=document.createElement('div');d.style.cssText='position:absolute;width:0;height:0;overflow:hidden';d.innerHTML='<svg width=\"0\" height=\"0\" style=\"position:absolute\" aria-hidden=\"true\"><filter id=\"gwspin-sharp\" color-interpolation-filters=\"sRGB\"><feConvolveMatrix order=\"3\" kernelMatrix=\"0 -0.75 0 -0.75 4 -0.75 0 -0.75 0\" preserveAlpha=\"true\" edgeMode=\"duplicate\"/></filter></svg>';document.body.appendChild(d);}
 $('reset').onclick=()=>{S.a=0;setRow(0);resetView();};
 $('close').onclick=()=>close();
 $('spinSel').onchange=e=>load(e.target.value);
