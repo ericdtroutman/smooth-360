@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Smooth 360 for Warhammer
 // @namespace    https://ericdtroutman.github.io/smooth-360/
-// @version      1.0.0
+// @version      1.0.1
 // @description  Adds a smooth, zoomable 360° viewer button to warhammer.com product pages.
 // @match        https://www.warhammer.com/*
 // @grant        none
@@ -52,6 +52,7 @@ sh.innerHTML=`<style>
 .wrap{position:fixed;inset:0;background:#0e0d0c;color:#ece7df;display:flex;flex-direction:column}
 .top,.bot{display:flex;align-items:center;gap:12px;padding:10px 16px;flex-wrap:wrap}
 .top{justify-content:space-between}
+.bot{padding-right:84px}
 .name{font-size:14px;font-weight:600;letter-spacing:.02em}
 .meta{font-size:12px;color:#a59d92;font-variant-numeric:tabular-nums}
 select,button{font:inherit;font-size:13px;color:#ece7df;background:#2a2723;border:1px solid #47423b;border-radius:6px;padding:6px 10px;cursor:pointer}
@@ -69,7 +70,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
 input[type=range]{width:min(360px,50vw);accent-color:#c9a45c}
 .hint{font-size:12px;color:#8a8278;margin-left:auto}
 .wrap{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
-@media (max-width:700px),(pointer:coarse){.hint,.name{display:none}.meta{font-size:11px}.stage{margin:0 8px}.top,.bot{padding:8px 10px;gap:8px}input[type=range]{width:calc(100vw - 90px)}}
+@media (max-width:700px),(pointer:coarse){.hint,.name{display:none}.meta{font-size:11px}.bot{padding-right:76px}.stage{margin:0 8px}.top,.bot{padding:8px 10px;gap:8px}input[type=range]{width:calc(100vw - 90px)}}
 </style>
 <div class="wrap" role="dialog" aria-label="360 viewer">
  <div class="top">

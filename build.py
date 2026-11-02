@@ -10,7 +10,7 @@ import urllib.parse
 from pathlib import Path
 
 ROOT = Path(__file__).parent
-VERSION = "1.0.0"
+VERSION = "1.0.1"
 PAGES = "https://ericdtroutman.github.io/smooth-360"
 
 code = (ROOT / "spin.js").read_text()
