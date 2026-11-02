@@ -138,7 +138,7 @@ async function load(folder){
   $('meta').textContent=MODE==='app'&&S.name?S.name:`${g.nc} angles × ${g.nr} heights · ${Math.round(360/g.nc)}° per photo`;
   $('rows').innerHTML='';for(let r=0;r<g.nr;r++){const b=document.createElement('button');b.textContent=r+1;b.title='Camera height '+(r+1);b.onclick=()=>setRow(r);$('rows').appendChild(b);}
   setRow(0);
-  const w=Math.min(1600,Math.round(Math.max(innerWidth,innerHeight)*(devicePixelRatio||1)/100)*100);
+  const w=1600; // largest size the server returns (originals are 800px; it upscales with light sharpening)
   let done=0;const total=g.nr*g.nc;
   const order=[];for(let r=0;r<g.nr;r++)for(let c=0;c<g.nc;c++)order.push([r,c]);
   S.imgs=Array.from({length:g.nr},()=>new Array(g.nc));
